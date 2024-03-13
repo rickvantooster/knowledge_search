@@ -1,6 +1,7 @@
 /target
 /data_dir
 /20_newsgroups
-data_dir.index.json
-index_pretty.json
-out.log
+*.json
+*.db
+*.bin
+*.log

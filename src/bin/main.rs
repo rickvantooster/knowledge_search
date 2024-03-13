@@ -1,11 +1,8 @@
 use std::{path::{Path, PathBuf},  fs::File, sync::{Arc, RwLock}, ops::Deref, hint::black_box};
-use knowledge_search::{model::CorpusModel, indexer::{add_dir_to_corpus, add_dir_to_corpus_joined}};
+use knowledge_search::{indexer::add_dir_to_corpus_joined, model::{base::Model, invertedmodel::InvertedModel, json_model::JsonModel, path_to_index_name, CorpusModel, ModelType}};
 use tracing_subscriber::{layer::SubscriberExt, Layer, util::SubscriberInitExt, filter::LevelFilter};
 use knowledge_search::tui::tui;
 
-#[cfg(feature = "dhat-heap")]
-#[global_allocator]
-static ALLOC: dhat::Alloc = dhat::Alloc;
 
 use knowledge_search::{indexer::IndexerTask, model::GLOB_CORPUS};
 
@@ -20,26 +17,14 @@ fn init_logging() {
 
 }
 
-fn path_to_index_name(path: &Path) -> PathBuf {
-    let possible_name = path.file_name();
-    if possible_name.is_none() {
-        eprintln!("Invalid directory name {}", path.display());
-        std::process::exit(3);
-    }
-    let name = path.file_name().unwrap().clone();
-    let mut index_name = name.to_str().unwrap().to_string();
-    index_name.push_str(".index.json");
-    PathBuf::from(index_name)
-
-}
 
 
 fn setup_glob_corpus(path: PathBuf){
-    let index_path = path_to_index_name(&path);
+    let index_path = path_to_index_name(&path, ModelType::Inverted);
     
-    //update_corpus(&path, curr_corpus);
 
-    let corpus = Arc::new(RwLock::new(CorpusModel::from_disk(&index_path).unwrap_or(CorpusModel::new())));
+    //let corpus = Arc::new(RwLock::new(JsonModel::from_disk(&index_path).unwrap_or(JsonModel::new())));
+    let corpus = Arc::new(RwLock::new(CorpusModel::new_inverted_model(&index_path)));
     GLOB_CORPUS.set(corpus).unwrap();
     let start = std::time::Instant::now();
 
@@ -53,36 +38,37 @@ fn setup_glob_corpus(path: PathBuf){
 }
 
 fn bench_alloc(path: PathBuf) {
-    {            
-        let corpus = Arc::new(RwLock::new(CorpusModel::new()));
+    {
+        //let model = JsonModel::from_disk(&path_to_index_name(&path, ModelType::Json)).unwrap_or(JsonModel::new());
+        let model = CorpusModel::new_inverted_model(&path);
+        let corpus = Arc::new(RwLock::new(model));
         GLOB_CORPUS.set(corpus).unwrap();
     }
     let _ = black_box(add_dir_to_corpus_joined(&path));
+
+    GLOB_CORPUS.get().unwrap().write().unwrap().store_with_name(&path_to_index_name(&path, ModelType::Inverted));
+    let query: Vec<char> = "Tesla".chars().collect();
+    let results: Vec<(PathBuf, f64)> = GLOB_CORPUS.get().unwrap().read().unwrap().search_simple(&query).iter().cloned().collect();
+    println!("results: {:#?}", results);
 }
 
 fn entry(path: PathBuf) {
     //bench_indexing(path.to_path_buf());
-    bench_alloc(path);
-    /*
+    //bench_alloc(path);
     
-    let index_path = path_to_index_name(&path);
+    let index_path = path_to_index_name(&path, ModelType::Inverted);
     setup_glob_corpus(path.to_path_buf());
     let mut indexer = IndexerTask::new(path.clone(), index_path);
 
     tui(&mut indexer).unwrap();
-    */
 }
 
 
 fn main() {
-    #[cfg(feature = "dhat-heap")]
-    let _profiler = dhat::Profiler::new_heap();
 
-
-    rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
+    //rayon::ThreadPoolBuilder::new().num_threads(4).build_global().unwrap();
 
     init_logging();
-    /*
 
     let args: Vec<String> = std::env::args().collect();
     if args.len() != 2 {
@@ -97,10 +83,8 @@ fn main() {
         eprintln!("Error: {} is not a directory", args.get(1).unwrap());
         std::process::exit(2);
     }
-    */
 
-    let mut possible_dir = PathBuf::from("./20_newsgroups");
-
+    //let mut possible_dir = PathBuf::from("./20_newsgroups");
     entry(possible_dir);
 }
 

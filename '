@@ -1,0 +1,152 @@
+use std::{collections::{HashMap, HashSet}, path::PathBuf, time::UNIX_EPOCH, usize};
+
+use crate::lexer::Lexer;
+
+use super::base::{Model, TermFrequency, get_last_modified};
+
+
+pub type TF = f64;
+
+pub struct InvertedModelDocumentMeta {
+    path: PathBuf,
+    terms: HashSet<String>,
+    last_updated: usize
+
+}
+
+pub struct InvertedModel {
+    term_frequency: HashMap<String, HashMap<PathBuf, TF>>,
+    document_frequency: HashMap<String, usize>,
+    documents_meta: HashMap<PathBuf, InvertedModelDocumentMeta>
+}
+
+impl Model for InvertedModel {
+    fn add_document(&mut self, path: PathBuf, content: &[char]) {
+        if let Some(curr) = self.documents_meta.get(&path) {
+            for term in &curr.terms {
+                self.term_frequency.get_mut(term).unwrap().remove(&path);
+            }
+        }
+
+        let mut doc_meta = InvertedModelDocumentMeta{
+            path: path.clone(),
+            terms: HashSet::new(),
+            last_updated: get_last_modified(&path).unwrap().duration_since(UNIX_EPOCH).unwrap().as_secs() as usize,
+        };
+
+        
+        let lexer = Lexer::new_stemmed(content);
+        let terms: Vec<String> = lexer.collect();
+        doc_meta.terms = HashSet::from_iter(terms.iter().cloned());
+        let count: usize = terms.len();
+
+        let mut tf = HashMap::<String, usize>::new();
+
+        for term in terms {
+            if let Some(entry) = tf.get_mut(&term) {
+                *entry += 1;
+            }else{
+                tf.insert(term.clone(), 1);
+            }
+        }
+
+        
+
+        for (term, freq) in tf {
+            if let Some(entry) = self.term_frequency.get_mut(&term) {
+                if !entry.contains_key(&path) {
+                    entry.insert(path.clone(), freq as f64 / count as f64);
+                    if let Some(d) = self.document_frequency.get_mut(&term) {
+                        *d += 1;
+                    }else{
+                        self.document_frequency.insert(term.clone(), 1);
+                    }
+                }
+            }
+
+
+        }
+
+
+
+    }
+
+    fn remove_document(&mut self, path: PathBuf) {
+        if let Some(curr) = self.documents_meta.remove(&path) {
+            for term in &curr.terms {
+                self.term_frequency.get_mut(term).unwrap().remove(&path);
+                if let Some(df) = self.document_frequency.get_mut(&term) {
+                    *df -= 1;
+
+                }
+            }
+        }
+        todo!()
+    }
+
+    fn needs_reindex(&self, path: &PathBuf) -> Result<bool, super::base::ReindexError> {
+        if !self.documents_meta.contains_key(path) {
+            return Ok(true)
+        }
+
+        let last_updated = self.documents_meta.get(path).unwrap().last_updated;
+
+        let file_last_updated = get_last_modified(path)?.duration_since(UNIX_EPOCH).unwrap().as_secs() as usize;
+
+        Ok(file_last_updated > last_updated)
+
+
+    }
+
+    fn store_with_name(&mut self, index_path: &PathBuf) {
+        todo!()
+    }
+
+    fn store(&mut self) {
+        todo!()
+    }
+
+    fn from_disk(index_path: &std::path::Path) -> Option<Self> where Self: Sized {
+        todo!()
+    }
+
+    fn search_simple(&self, query: &[char]) -> Vec<(PathBuf, f64)> {
+        todo!()
+    }
+
+    fn search_singular_exact(&self, query: &[char]) -> Vec<(PathBuf, f64)> {
+        todo!()
+    }
+
+    fn search_phrase(&self, query: &[char]) -> Vec<(PathBuf, f64)> {
+        todo!()
+    }
+
+    fn contains_tokens_sequential(&self, pos: usize, qt: Vec<String>, doc: &super::base::Document) -> bool {
+        todo!()
+    }
+
+    fn assert_next_token_pos(&self, doc: &super::base::Document, pos: usize, t: &String) -> bool {
+        todo!()
+    }
+
+    fn docs_with_all_terms(&self, qt: &[String]) -> Option<Vec<PathBuf>> {
+        todo!()
+    }
+
+    fn get_documents(&self) -> super::base::Documents {
+        todo!()
+    }
+
+    fn delete_removed_files(&mut self) {
+        todo!()
+    }
+
+    fn add_document_batched(&mut self, batch: Vec<(PathBuf, Vec<char>)>, dir: PathBuf) {
+        todo!()
+    }
+
+    fn reset(&mut self) {
+        todo!()
+    }
+}

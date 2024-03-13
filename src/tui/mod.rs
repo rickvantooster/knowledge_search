@@ -3,6 +3,8 @@ use std::{io::{stdout, Result}, path::PathBuf, fmt::Display};
 use crossterm::{ExecutableCommand, terminal::{EnterAlternateScreen, enable_raw_mode, LeaveAlternateScreen, disable_raw_mode}, event::{self, KeyEventKind, KeyCode, KeyModifiers, KeyEvent, Event}};
 use ratatui::{Terminal, prelude::{CrosstermBackend, Stylize, Layout, Direction, Constraint}, widgets::{Paragraph, List, ListDirection, ListState}, style::{Modifier, Style, Color}, Frame,};
 
+use crate::model::base::Model;
+
 use crate::{model::GLOB_CORPUS, indexer::IndexerTask};
 
 #[derive(PartialEq, Eq)]

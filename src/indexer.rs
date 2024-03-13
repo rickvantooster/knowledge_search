@@ -3,8 +3,9 @@ use std::{path::{Path, PathBuf}, sync::{Arc, Mutex, RwLock}, fs::read_dir, char}
 use rayon::prelude::*;
 use notify::{Event, PollWatcher, Config, Watcher};
 use rayon::iter::ParallelBridge;
+use crate::model::base::Model;
 
-use crate::{model::{GLOB_CORPUS, CorpusModel}, parser::{txt::parse_txt, docx::get_docx_text_manual, html::{get_html_text, get_xhtml}, pdf::get_pdf, error::ParserError}, threadpool::ThreadPool};
+use crate::{model::{GLOB_CORPUS, json_model::JsonModel}, parser::{txt::parse_txt, docx::get_docx_text_manual, html::{get_html_text, get_xhtml}, pdf::get_pdf, error::ParserError}, threadpool::ThreadPool};
 
 pub struct IndexerTask {
     path: PathBuf,
@@ -78,6 +79,7 @@ pub fn contents_by_file_type(file: &Path) -> Result<Option<Vec<char>>, ParserErr
             "html" | "htm" => get_html_text(file),
             "xhtml" | "xml" => get_xhtml(file),
             "pdf" => get_pdf(file),
+			"" => parse_txt(file),
             _ => {
                 tracing::info!("Filepath ({}), File type {} is currently not supported", file.display(), ext.to_str().unwrap());
                 return Ok(None);
@@ -247,7 +249,6 @@ pub fn add_dir_to_corpus(dir_path: &Path) -> Result<(), ()> {
 
 
 pub fn add_dir_to_corpus_joined(dir_path: &Path) -> Result<(), ()> {
-    //println!("processing dir: {}", dir_path.display());
 
     let dir = read_dir(dir_path).map_err(|e| {
          tracing::error!("could not open directory {} for indexing: {e}",
@@ -305,7 +306,7 @@ pub fn add_dir_to_corpus_joined(dir_path: &Path) -> Result<(), ()> {
 
         let result = contents_by_file_type(Path::new(&file_path));
         if let Err(ref err) = result {
-            tracing::error!("{err}");
+            tracing::error!("error on file {}: {err}", file_path.display());
             return None;
         }
 
@@ -317,12 +318,11 @@ pub fn add_dir_to_corpus_joined(dir_path: &Path) -> Result<(), ()> {
         None
 
 
-    }).for_each(|(file_path, content)|{
-        GLOB_CORPUS.get().unwrap().write().unwrap().add_document(file_path.clone(), &content);
+    }).for_each(|(path, content)| {
+        GLOB_CORPUS.get().unwrap().write().unwrap().add_document(path, &content);
     });
 
 
     Ok(())
 }
-
 

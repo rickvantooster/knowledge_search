@@ -3,10 +3,11 @@ use std::{path::Path, io::{BufReader, Read}};
 use super::error::ParserError;
 
 pub fn parse_txt(file: &Path) -> Result<Vec<char>, ParserError> {
-    let mut result = String::new();
+    let mut result: Vec<u8> = Vec::new();
     let file = std::fs::File::open(file)?;
     let mut reader = BufReader::new(file);
-    reader.read_to_string(&mut result)?;
+    reader.read_to_end(&mut result)?;
+    let result = String::from_utf8_lossy(&result);
 
     
 
